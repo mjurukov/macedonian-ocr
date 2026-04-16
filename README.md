@@ -19,13 +19,29 @@ Tested on 10 labeled pages from Macedonian books. MK-Acc measures accuracy on Ma
 git clone https://github.com/mjurukov/macedonian-ocr
 cd macedonian-ocr
 bash 01_setup.sh
-
-# 2. Download model weights
-# (releases page → mk_rec_v7_infer.zip → extract to output/)
-
-# 3. Run OCR on an image
 source venv/bin/activate
-python3 visualize_detections.py your_page.jpg --out viz/
+
+# 2. Download model weights from HuggingFace
+pip install huggingface_hub
+python3 -c "
+from huggingface_hub import snapshot_download
+snapshot_download('mjurukov/macedonian-ocr-v7', local_dir='output/mk_rec_v7_infer')
+"
+
+# 3. Run OCR
+from paddleocr import PaddleOCR
+ocr = PaddleOCR(
+    text_recognition_model_dir='output/mk_rec_v7_infer',
+    text_det_thresh=0.25,
+    text_det_box_thresh=0.30,
+    text_det_unclip_ratio=2.2,
+    use_doc_orientation_classify=False,
+    use_doc_unwarping=False,
+)
+result = ocr.predict('your_page.jpg')
+for page in result:
+    for text, score in zip(page['rec_texts'], page['rec_scores']):
+        print(f'{score:.2f}  {text}')
 ```
 
 ## Benchmark
