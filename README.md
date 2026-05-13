@@ -4,13 +4,35 @@ Fine-tuned PaddleOCR recognition model for Macedonian Cyrillic text in scanned b
 
 ## Results
 
+Tested on 10 labeled pages from Macedonian books. MK-Acc measures accuracy on the 14 Macedonian-specific Cyrillic letters (ѓ, ќ, љ, њ, џ, ѕ, ј and uppercase).
+
 | Engine | CER | WER | MK-Acc |
 |--------|-----|-----|--------|
-| **V7 (this model)** | **0.45%** | **~2%** | **99.6%** |
-| Tesseract (`mkd`) | 2.15% | 6.3% | 96.3% |
-| V5 (previous) | 2.21% | 3.9% | 99.2% |
+| **V8 (this model)** | **0.26%** | — | — |
+| V7 | 0.31% | ~2% | 99.6% |
+| Tesseract (`mkd`) | 1.34% | — | — |
+| DeepSeek-OCR | TODO | — | — |
+| Qwen2.5-VL 72B | TODO | — | — |
+| Gemma4 31B | TODO | — | — |
 
-Tested on 10 labeled pages from Macedonian books. MK-Acc measures accuracy on Macedonian-specific letters (ѓ, ќ, љ, њ, џ, ѕ, ј).
+The TODO rows will be filled in after running `benchmark_h100.py` on H100 hardware.
+
+## H100 VLM Benchmark
+
+To run the large-model comparison (Qwen2.5-VL 72B, Gemma4 31B, Phi-4 Vision, DeepSeek-OCR):
+
+```bash
+git clone https://github.com/mjurukov/macedonian-ocr
+cd macedonian-ocr
+bash setup_faculty.sh                 # installs Ollama, downloads V8 model (~70 MB)
+python3 benchmark_h100.py --pull      # downloads Ollama models (~73 GB)
+python3 benchmark_h100.py             # runs benchmark, saves results_h100.json
+```
+
+If the run is interrupted, resume with:
+```bash
+python3 benchmark_h100.py --resume results_h100.json
+```
 
 ## Quick start
 

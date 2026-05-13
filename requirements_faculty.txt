@@ -1,0 +1,5 @@
+# Minimal requirements for running the H100 VLM benchmark on faculty hardware.
+# benchmark_h100.py itself is pure stdlib — this is only needed for the
+# HuggingFace model download step in setup_faculty.sh.
+
+huggingface_hub>=0.23.0
