@@ -1,15 +1,11 @@
-FROM nvidia/cuda:12.4.1-base-ubuntu22.04
+FROM ollama/ollama:latest
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Add Python and curl (curl needed for the entrypoint health check)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl ca-certificates python3 \
+        curl python3 \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Ollama binary (no systemd, no sudo needed at runtime)
-RUN curl -fsSL https://ollama.com/download/ollama-linux-amd64 \
-        -o /usr/local/bin/ollama \
-    && chmod +x /usr/local/bin/ollama
 
 WORKDIR /app
 COPY . .

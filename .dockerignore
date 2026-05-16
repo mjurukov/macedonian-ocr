@@ -1,7 +1,20 @@
 output/
 venv/
 venv_faculty/
+train_data/
+PaddleOCR/
+models/
+pretrained/
+annotation_tool/
+fonts/
+viz/
+aligned/
 __pycache__/
 *.pyc
 *.json
 .git/
+
+# From data/ we only need the 10 test book images and ground truth
+data/train_data/
+data/generated*/
+data/val*/
