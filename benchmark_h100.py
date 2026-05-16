@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-H100 VLM Benchmark — compare large vision-language models against V7 PaddleOCR
+VLM Benchmark — compare large vision-language models against V7/V8 PaddleOCR
 on 10 Macedonian Cyrillic book pages.
 
 Models (Ollama):
@@ -9,15 +9,23 @@ Models (Ollama):
     phi4-vision    Phi-4 Vision      ~5 GB
     deepseek-ocr   DeepSeek-OCR      ~4 GB
 
-Setup on H100:
+Setup with Docker (recommended — no sudo needed):
     git clone https://github.com/mjurukov/macedonian-ocr
     cd macedonian-ocr
-    bash setup_faculty.sh                  # installs Ollama, downloads V7 model
-    python3 benchmark_h100.py --pull       # downloads ~73 GB of Ollama models
-    python3 benchmark_h100.py
+    docker build -t macedonian-ocr-benchmark .
+    mkdir -p results
+    docker run --gpus all --rm \\
+        -v ollama_cache:/root/.ollama \\
+        -v "$(pwd)":/output \\
+        macedonian-ocr-benchmark \\
+        --pull --save /output/results_h100.json
 
 Resume after interruption:
-    python3 benchmark_h100.py --resume results_h100.json
+    docker run --gpus all --rm \\
+        -v ollama_cache:/root/.ollama \\
+        -v "$(pwd)":/output \\
+        macedonian-ocr-benchmark \\
+        --resume /output/results_h100.json --save /output/results_h100.json
 
 Run only specific models:
     python3 benchmark_h100.py --models qwen2.5vl:72b,deepseek-ocr
@@ -180,14 +188,20 @@ def unload_model(tag):
     except Exception:
         pass
 
-def run_model(tag, img_path, prompt, timeout=300):
+def run_model(tag, img_path, prompt, total_timeout=300, idle_timeout=60):
+    """Run inference via Ollama streaming API.
+
+    total_timeout — hard wall-clock limit for the whole request (seconds)
+    idle_timeout  — per-readline socket timeout; fires if no token arrives for
+                    this long (covers model loading time on the first page)
+    """
     with open(img_path, 'rb') as f:
         img_b64 = base64.b64encode(f.read()).decode()
     payload = json.dumps({
         'model': tag,
         'prompt': prompt,
         'images': [img_b64],
-        'stream': False,
+        'stream': True,          # tokens arrive incrementally — no idle stall
         'options': {'temperature': 0},
     }).encode()
     req = urllib.request.Request(
@@ -197,10 +211,26 @@ def run_model(tag, img_path, prompt, timeout=300):
         method='POST',
     )
     t0 = time.perf_counter()
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        data = json.loads(r.read())
+    deadline = t0 + total_timeout
+    parts = []
+    with urllib.request.urlopen(req, timeout=idle_timeout) as r:
+        while True:
+            if time.perf_counter() > deadline:
+                raise TimeoutError(f'wall-clock timeout ({total_timeout}s)')
+            line = r.readline()
+            if not line:
+                break
+            try:
+                chunk = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if 'error' in chunk:
+                raise RuntimeError(chunk['error'])
+            parts.append(chunk.get('response', ''))
+            if chunk.get('done'):
+                break
     ms = (time.perf_counter() - t0) * 1000
-    text = data.get('response', '').strip()
+    text = ''.join(parts).strip()
     return ' '.join(text.split()), ms
 
 # ── Test data ──────────────────────────────────────────────────────────────────
@@ -394,10 +424,13 @@ def main():
         per_page = []
 
         for i, (name, img_path, gt) in enumerate(pairs):
-            # First page gets extra time for model load into GPU memory
-            timeout = 900 if i == 0 else 300
+            # First page: model may be loading from disk — long idle and total timeout.
+            # Subsequent pages: model is warm, but large outputs can still take minutes.
+            total_t = 1800 if i == 0 else 900
+            idle_t  = 600  if i == 0 else 120
             try:
-                pred, ms = run_model(tag, img_path, prompt, timeout=timeout)
+                pred, ms = run_model(tag, img_path, prompt,
+                                     total_timeout=total_t, idle_timeout=idle_t)
                 c = cer(pred, gt)
                 w = wer(pred, gt)
                 v8_c  = V8_REF.get(name)
@@ -423,7 +456,7 @@ def main():
               f'  ({sign}{delta_v8:.2f}% vs V8)')
         print(f'  Unloading {tag} from GPU memory...')
         unload_model(tag)
-        time.sleep(2)
+        time.sleep(5)  # let GPU memory settle before next model loads
         print()
 
         results[key] = {'tag': tag, 'label': label, 'pages': per_page}

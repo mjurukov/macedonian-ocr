@@ -17,22 +17,39 @@ Tested on 10 labeled pages from Macedonian books. MK-Acc measures accuracy on th
 
 The TODO rows will be filled in after running `benchmark_h100.py` on H100 hardware.
 
-## H100 VLM Benchmark
+## VLM Benchmark (Docker — no sudo required)
 
-To run the large-model comparison (Qwen2.5-VL 72B, Gemma4 31B, Phi-4 Vision, DeepSeek-OCR):
+Compares Qwen2.5-VL 72B, Gemma4 31B, Phi-4 Vision and DeepSeek-OCR against the
+PaddleOCR baseline on 10 labeled Macedonian book pages.
+Requires Docker with NVIDIA Container Toolkit (`--gpus all`).
 
 ```bash
 git clone https://github.com/mjurukov/macedonian-ocr
 cd macedonian-ocr
-bash setup_faculty.sh                 # installs Ollama, downloads V8 model (~70 MB)
-python3 benchmark_h100.py --pull      # downloads Ollama models (~73 GB)
-python3 benchmark_h100.py             # runs benchmark, saves results_h100.json
+
+# Build once (~5 min, ~600 MB image)
+docker build -t macedonian-ocr-benchmark .
+
+# Run — pulls Ollama models (~73 GB total) then runs benchmark
+mkdir -p results
+docker run --gpus all --rm \
+    -v ollama_cache:/root/.ollama \
+    -v "$(pwd)":/output \
+    macedonian-ocr-benchmark \
+    --pull --save /output/results_h100.json
 ```
 
-If the run is interrupted, resume with:
+Resume after an interruption:
 ```bash
-python3 benchmark_h100.py --resume results_h100.json
+docker run --gpus all --rm \
+    -v ollama_cache:/root/.ollama \
+    -v "$(pwd)":/output \
+    macedonian-ocr-benchmark \
+    --resume /output/results_h100.json --save /output/results_h100.json
 ```
+
+The `ollama_cache` named volume persists downloaded models between runs.
+Results are written to `results_h100.json` in the current directory.
 
 ## Quick start
 

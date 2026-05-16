@@ -1,0 +1,7 @@
+output/
+venv/
+venv_faculty/
+__pycache__/
+*.pyc
+*.json
+.git/
