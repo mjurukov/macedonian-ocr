@@ -352,11 +352,17 @@ def main():
 
     # Build model list
     if args.models:
+        known = {tag: (key, label, pk) for tag, key, label, pk in DEFAULT_MODELS}
         model_list = []
         for tag in args.models.split(','):
             tag = tag.strip()
-            key = re.sub(r'[^a-z0-9_]', '_', tag.lower())[:16]
-            model_list.append((tag, key, tag, 'vlm'))  # unknown models default to vlm prompt
+            if tag in known:
+                key, label, pk = known[tag]
+            else:
+                key   = re.sub(r'[^a-z0-9_]', '_', tag.lower())[:16]
+                label = tag
+                pk    = 'vlm'
+            model_list.append((tag, key, label, pk))
     else:
         model_list = list(DEFAULT_MODELS)
 
